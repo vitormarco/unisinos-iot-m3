@@ -2,13 +2,28 @@
 
 import { useEffect, useState } from "react";
 import * as mqtt from "mqtt";
+import Toggle from "./Toggle";
 
 const clientId = "mqttjs_" + Math.random().toString(16).substr(2, 8);
 const HOST = "wss://broker.emqx.io:8084/mqtt";
+const LED = {
+  off: "0",
+  on: "1",
+};
+
+const topics = {
+  topic_on_off_led: "vam_topic_on_off_led",
+  topic_sensor_temperature: "vam_topic_sensor_temperature",
+  topic_sensor_humidity: "vam_topic_sensor_humidity",
+};
 
 export const Infos = () => {
   const [client, setClient] = useState<mqtt.MqttClient>();
-  const [info, setInfo] = useState<{ temp?: string; humidity?: string }>({});
+  const [info, setInfo] = useState<{
+    temp?: string;
+    humidity?: string;
+    ledOn: string;
+  }>({ ledOn: "0" });
 
   useEffect(() => {
     const setupMqttClient = () => {
@@ -21,16 +36,16 @@ export const Infos = () => {
 
       mqttClient.on("connect", () => {
         console.log("Conectado ao broker MQTT local");
-        mqttClient.subscribe("topic_on_off_led");
-        mqttClient.subscribe("topic_sensor_temperature");
-        mqttClient.subscribe("topic_sensor_humidity");
+        mqttClient.subscribe(topics.topic_on_off_led);
+        mqttClient.subscribe(topics.topic_sensor_temperature);
+        mqttClient.subscribe(topics.topic_sensor_humidity);
       });
 
       mqttClient.on("message", (topic, message) => {
-        if (topic === "topic_sensor_temperature") {
+        if (topic === topics.topic_sensor_temperature) {
           setInfo((oldState) => ({ ...oldState, temp: message.toString() }));
         }
-        if (topic === "topic_sensor_humidity") {
+        if (topic === topics.topic_sensor_humidity) {
           setInfo((oldState) => ({
             ...oldState,
             humidity: message.toString(),
@@ -46,8 +61,8 @@ export const Infos = () => {
     setupMqttClient();
   }, []);
 
-  const handleTurnOnOffLed = (onOff = "1") => {
-    client?.publish("topic_on_off_led", onOff);
+  const handleTurnOnOffLed = (onOff = LED.on) => {
+    client?.publish(topics.topic_on_off_led, onOff);
   };
 
   return (
@@ -55,18 +70,19 @@ export const Infos = () => {
       <section className="w-full max-w-md mx-auto bg-gray-50 rounded-lg shadow-lg p-6">
         <h2 className="text-2xl font-semibold mb-4">Controle do LED</h2>
         <div className="flex gap-2">
-          <button
-            className="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-lg focus:outline-none focus:shadow-outline"
-            onClick={() => handleTurnOnOffLed()}
-          >
-            Ligar
-          </button>
-          <button
-            className="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg focus:outline-none focus:shadow-outline"
-            onClick={() => handleTurnOnOffLed("0")}
-          >
-            Desligar
-          </button>
+          <Toggle
+            name="ledOnOff"
+            isChecked={info.ledOn === LED.on}
+            onChange={() => {
+              const ledState = info.ledOn === LED.on ? LED.off : LED.on;
+
+              setInfo((oldState) => ({
+                ...oldState,
+                ledOn: ledState,
+              }));
+              handleTurnOnOffLed(ledState);
+            }}
+          />
         </div>
       </section>
       <section className="w-full max-w-md mx-auto bg-gray-50 rounded-lg shadow-lg p-6">
